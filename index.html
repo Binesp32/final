@@ -1,75 +1,89 @@
-<!--
-  Rui Santos
-  Complete project details at https://RandomNerdTutorials.com/esp32-web-bluetooth/
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files.
-  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
--->
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>ESP32 Web BLE App</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/png" href="favicon.ico">
-    <link rel="stylesheet" type="text/css" href="style.css">
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 BLE Motor Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
 </head>
-<body>
-    <div class="topnav">
-        <h1>ESP32 Web BLE Application</h1>
-    </div>
-    <div class="content">
-        <div class="card-grid">
-            <div class="card">
-                <p>
-                    <button id="connectBleButton" class="connectButton"> Connect to BLE Device</button>
-                    <button id="disconnectBleButton" class="disconnectButton"> Disconnect BLE Device</button>
-                </p>
-                <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
+<body class="bg-gray-100 flex justify-center items-center min-h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h1 class="text-2xl font-semibold text-blue-600 mb-4 text-center">ESP32 BLE Motor Control</h1>
+        <div class="mb-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <label for="bleState" class="block text-gray-700 text-sm font-bold mb-2">BLE Status:</label>
+                <div id="bleState" class="text-gray-500 italic">Disconnected</div>
+            </div>
+            <div class="flex justify-center space-x-4">
+                <button id="connectBleButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Connect</button>
+                <button id="disconnectBleButton" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Disconnect</button>
             </div>
         </div>
-        <div class="card-grid">
-            <div class="card">
-                <h2>Fetched Value</h2>
-                <p class="reading"><span id="valueContainer">NaN</span></p>
-                <p class="gray-label">Last reading: <span id="timestamp"></span></p>
-            </div>
 
-            <div class="card">
-                <h2>Control GPIO 2</h2>
-                <button id="onButton" class="onButton">ON</button>
-                <button id="offButton" class="offButton">OFF</button>
-                <p class="gray-label">Last value sent: <span id="valueSent"></span></p>
+        <div class="mb-6 space-y-4">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">Motor Control:</h2>
+             <div class="flex items-center justify-between">
+                <label for="speedInput" class="block text-gray-700 text-sm font-bold mb-2">Set Speed:</label>
+                <input type="number" id="speedInput" placeholder="0-255" class="shadow appearance-none border rounded w-24 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="flex justify-center space-x-4">
+                <button id="setSpeedButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Set Speed</button>
+                <button id="stopButton" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Stop Motor</button>
+            </div>
+        </div>
+
+        <div class="mb-4 space-y-2">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">Motor Feedback:</h2>
+            <div class="flex items-center justify-between">
+                <label for="retrievedValue" class="block text-gray-700 text-sm font-bold">Current Speed:</label>
+                <div id="valueContainer" class="text-gray-900 font-medium">0</div>
+            </div>
+            <div class="flex items-center justify-between">
+                <label for="latestValueSent" class="block text-gray-700 text-sm font-bold">Speed Sent:</label>
+                <div id="latestValueSent" class="text-blue-600 font-medium">0</div>
+            </div>
+            <div class="flex items-center justify-between">
+                <label for="timestamp" class="block text-gray-700 text-sm font-bold">Timestamp:</label>
+                <div id="timestamp" class="text-gray-600 text-sm italic"></div>
             </div>
         </div>
     </div>
-</body>
-<script>
+
+    <script>
     // DOM Elements
     const connectButton = document.getElementById('connectBleButton');
     const disconnectButton = document.getElementById('disconnectBleButton');
-    const onButton = document.getElementById('onButton');
-    const offButton = document.getElementById('offButton');
+    const setSpeedButton = document.getElementById('setSpeedButton');
+    const stopButton = document.getElementById('stopButton');
+    const speedInput = document.getElementById('speedInput');
     const retrievedValue = document.getElementById('valueContainer');
     const latestValueSent = document.getElementById('valueSent');
     const bleStateContainer = document.getElementById('bleState');
     const timestampContainer = document.getElementById('timestamp');
 
-    //Define BLE Device Specs
-    var deviceName ='ESP32';
+    // Define BLE Device Specs
+    var deviceName = 'ESP32_Motor_Control'; // Changed device name
     var bleService = '19b10000-e8f2-537e-4f6c-d104768a1214';
-    var ledCharacteristic = '19b10002-e8f2-537e-4f6c-d104768a1214';
-    var sensorCharacteristic= '19b10001-e8f2-537e-4f6c-d104768a1214';
+    var motorSpeedCharacteristic = '19b10002-e8f2-537e-4f6c-d104768a1214'; // Changed characteristic name
+    var encoderSpeedCharacteristic = '19b10001-e8f2-537e-4f6c-d104768a1214'; // Changed characteristic name
 
-    //Global Variables to Handle Bluetooth
+    // Global Variables to Handle Bluetooth
     var bleServer;
     var bleServiceFound;
-    var sensorCharacteristicFound;
+    var encoderSpeedCharacteristicFound;
+    var motorSpeedCharacteristicFound; //added
 
     // Connect Button (search for BLE Devices only if BLE is available)
     connectButton.addEventListener('click', (event) => {
-        if (isWebBluetoothEnabled()){
+        if (isWebBluetoothEnabled()) {
             connectToDevice();
         }
     });
@@ -77,9 +91,20 @@
     // Disconnect Button
     disconnectButton.addEventListener('click', disconnectDevice);
 
-    // Write to the ESP32 LED Characteristic
-    onButton.addEventListener('click', () => writeOnCharacteristic(1));
-    offButton.addEventListener('click', () => writeOnCharacteristic(0));
+    // Motor Control Button Actions
+    setSpeedButton.addEventListener('click', () => {
+        const speed = parseInt(speedInput.value);
+        if (isNaN(speed) || speed < 0 || speed > 255) {
+            alert('Please enter a valid speed between 0 and 255.');
+            return;
+        }
+        writeMotorSpeed(speed);
+    });
+
+    stopButton.addEventListener('click', () => {
+        writeMotorSpeed(0); // Stop the motor by setting speed to 0
+        speedInput.value = 0;
+    });
 
     // Check if BLE is available in your Browser
     function isWebBluetoothEnabled() {
@@ -93,109 +118,122 @@
     }
 
     // Connect to BLE Device and Enable Notifications
-    function connectToDevice(){
+    function connectToDevice() {
         console.log('Initializing Bluetooth...');
         navigator.bluetooth.requestDevice({
-            filters: [{name: deviceName}],
+            filters: [{ name: deviceName }],
             optionalServices: [bleService]
         })
-        .then(device => {
-            console.log('Device Selected:', device.name);
-            bleStateContainer.innerHTML = 'Connected to device ' + device.name;
-            bleStateContainer.style.color = "#24af37";
-            device.addEventListener('gattservicedisconnected', onDisconnected);
-            return device.gatt.connect();
-        })
-        .then(gattServer =>{
-            bleServer = gattServer;
-            console.log("Connected to GATT Server");
-            return bleServer.getPrimaryService(bleService);
-        })
-        .then(service => {
-            bleServiceFound = service;
-            console.log("Service discovered:", service.uuid);
-            return service.getCharacteristic(sensorCharacteristic);
-        })
-        .then(characteristic => {
-            console.log("Characteristic discovered:", characteristic.uuid);
-            sensorCharacteristicFound = characteristic;
-            characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
-            characteristic.startNotifications();
-            console.log("Notifications Started.");
-            return characteristic.readValue();
-        })
-        .then(value => {
-            console.log("Read value: ", value);
-            const decodedValue = new TextDecoder().decode(value);
-            console.log("Decoded value: ", decodedValue);
-            retrievedValue.innerHTML = decodedValue;
-        })
-        .catch(error => {
-            console.log('Error: ', error);
-        })
+            .then(device => {
+                console.log('Device Selected:', device.name);
+                bleStateContainer.innerHTML = 'Connected to device ' + device.name;
+                bleStateContainer.style.color = "#24af37";
+                device.addEventListener('gattservicedisconnected', onDisconnected);
+                return device.gatt.connect();
+            })
+            .then(gattServer => {
+                bleServer = gattServer;
+                console.log("Connected to GATT Server");
+                return bleServer.getPrimaryService(bleService);
+            })
+            .then(service => {
+                bleServiceFound = service;
+                console.log("Service discovered:", service.uuid);
+                // Get both characteristics
+                return Promise.all([
+                    service.getCharacteristic(encoderSpeedCharacteristic),
+                    service.getCharacteristic(motorSpeedCharacteristic) // Get the new characteristic
+                ]);
+            })
+            .then(characteristics => {
+                encoderSpeedCharacteristicFound = characteristics[0];
+                motorSpeedCharacteristicFound = characteristics[1]; // Store the new characteristic
+                console.log("Characteristics discovered:", encoderSpeedCharacteristicFound.uuid, motorSpeedCharacteristicFound.uuid);
+                encoderSpeedCharacteristicFound.addEventListener('characteristicvaluechanged', handleEncoderSpeedChanged);
+                return encoderSpeedCharacteristicFound.startNotifications();
+            })
+            .then(() => {
+                console.log("Encoder Speed Notifications Started.");
+                return encoderSpeedCharacteristicFound.readValue();
+            })
+            .then(value => {
+                console.log("Initial Encoder Speed Read: ", value);
+                const decodedValue = new TextDecoder().decode(value);
+                console.log("Decoded value: ", decodedValue);
+                retrievedValue.innerHTML = decodedValue;
+            })
+            .catch(error => {
+                console.log('Error: ', error);
+                bleStateContainer.innerHTML = "Error: " + error; //set error message
+                bleStateContainer.style.color = "#d13a30";
+            })
     }
 
-    function onDisconnected(event){
+    function onDisconnected(event) {
         console.log('Device Disconnected:', event.target.device.name);
-        bleStateContainer.innerHTML = "Device disconnected";
+        bleStateContainer.innerHTML = "Device Disconnected";
         bleStateContainer.style.color = "#d13a30";
-
+        // Attempt to reconnect (optional, might cause issues with some devices)
         connectToDevice();
     }
 
-    function handleCharacteristicChange(event){
+    function handleEncoderSpeedChanged(event) {
         const newValueReceived = new TextDecoder().decode(event.target.value);
-        console.log("Characteristic value changed: ", newValueReceived);
+        console.log("Encoder Speed Changed: ", newValueReceived);
         retrievedValue.innerHTML = newValueReceived;
         timestampContainer.innerHTML = getDateTime();
     }
 
-    function writeOnCharacteristic(value){
+    function writeMotorSpeed(speed) {
         if (bleServer && bleServer.connected) {
-            bleServiceFound.getCharacteristic(ledCharacteristic)
-            .then(characteristic => {
-                console.log("Found the LED characteristic: ", characteristic.uuid);
-                const data = new Uint8Array([value]);
-                return characteristic.writeValue(data);
-            })
-            .then(() => {
-                latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
-            })
-            .catch(error => {
-                console.error("Error writing to the LED characteristic: ", error);
-            });
+            bleServiceFound.getCharacteristic(motorSpeedCharacteristic) // Use the stored characteristic
+                .then(characteristic => {
+                    console.log("Found the Motor Speed characteristic: ", characteristic.uuid);
+                    const data = new Uint8Array([speed]);
+                    return characteristic.writeValue(data);
+                })
+                .then(() => {
+                    latestValueSent.innerHTML = speed;
+                    console.log("Value written to MotorSpeedCharacteristic:", speed);
+                })
+                .catch(error => {
+                    console.error("Error writing to the MotorSpeedCharacteristic: ", error);
+                    alert("Error writing speed to motor.  Check console for details.");
+                });
         } else {
-            console.error ("Bluetooth is not connected. Cannot write to characteristic.")
-            window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
+            console.error("Bluetooth is not connected. Cannot write to characteristic.")
+            alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
         }
     }
 
     function disconnectDevice() {
         console.log("Disconnect Device.");
         if (bleServer && bleServer.connected) {
-            if (sensorCharacteristicFound) {
-                sensorCharacteristicFound.stopNotifications()
+            if (encoderSpeedCharacteristicFound) {
+                encoderSpeedCharacteristicFound.stopNotifications()
                     .then(() => {
-                        console.log("Notifications Stopped");
+                        console.log("Encoder Speed Notifications Stopped");
                         return bleServer.disconnect();
                     })
                     .then(() => {
                         console.log("Device Disconnected");
                         bleStateContainer.innerHTML = "Device Disconnected";
                         bleStateContainer.style.color = "#d13a30";
-
                     })
                     .catch(error => {
                         console.log("An error occurred:", error);
+                        alert("An error occurred while disconnecting.  Check console for details.");
                     });
             } else {
                 console.log("No characteristic found to disconnect.");
+                bleServer.disconnect();
+                 bleStateContainer.innerHTML = "Device Disconnected";
+                 bleStateContainer.style.color = "#d13a30";
             }
         } else {
             // Throw an error if Bluetooth is not connected
             console.error("Bluetooth is not connected.");
-            window.alert("Bluetooth is not connected.")
+            alert("Bluetooth is not connected.")
         }
     }
 
@@ -211,8 +249,6 @@
         var datetime = day + "/" + month + "/" + year + " at " + hours + ":" + minutes + ":" + seconds;
         return datetime;
     }
-
-
-</script>
-
+    </script>
+</body>
 </html>
